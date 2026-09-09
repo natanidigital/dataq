@@ -1,0 +1,10 @@
+node_modules
+.next
+generated
+storage
+.env
+.env.*
+!.env.example
+!.env.docker.example
+.git
+logo-icon.jpg

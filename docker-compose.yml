@@ -1,0 +1,64 @@
+name: dataq
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-dataq}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env — see .env.docker.example}
+      POSTGRES_DB: ${POSTGRES_DB:-dataq}
+    volumes:
+      - dataq_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dataq}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-dataq}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-dataq}
+      AUTH_SECRET: ${AUTH_SECRET:?set AUTH_SECRET in .env, e.g. openssl rand -base64 33}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
+      AUTH_TRUST_HOST: "true"
+      TOTAL_BANDWIDTH_GB: ${TOTAL_BANDWIDTH_GB:-1000}
+    volumes:
+      # Uploaded images and admin-uploaded branding assets — the one thing
+      # that must survive a container rebuild/redeploy.
+      - dataq_storage:/app/storage
+    ports:
+      - "${APP_PORT:-3000}:3000"
+
+  # Optional: automatic HTTPS via Caddy, for a plain fresh VPS with no
+  # existing reverse proxy. Skip this entirely (just run `docker compose up
+  # -d app db`) if you already manage TLS elsewhere — e.g. CloudPanel's own
+  # Nginx as a reverse-proxy site pointed at 127.0.0.1:${APP_PORT}, same as
+  # this project's other deployments.
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - app
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    profiles: ["with-proxy"]
+
+volumes:
+  dataq_db:
+  dataq_storage:
+  caddy_data:
+  caddy_config:

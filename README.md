@@ -1,36 +1,92 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# dataq
 
-## Getting Started
+Self-hosted, private image hosting — invite-only, direct links, public/private
+toggle, admin-managed users with Free/Paid membership tiers, and white-label
+branding (logo, PWA icon, SEO). Built with Next.js, Prisma, and PostgreSQL.
 
-First, run the development server:
+## Quick install (fresh VPS, root)
+
+One command, on a clean Ubuntu/Debian server:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+curl -fsSL https://raw.githubusercontent.com/natanidigital/dataq/main/install.sh | sudo bash
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+This installs Docker if it's missing, clones the repo to `/opt/dataq`,
+generates a `.env` with fresh secrets, and starts the app + database with
+`docker compose`. When it finishes it prints the app's URL and the seeded
+admin username/password (shown once — save them).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+**With a domain already pointed at the server**, for automatic HTTPS via
+[Caddy](https://caddyserver.com/):
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+curl -fsSL https://raw.githubusercontent.com/natanidigital/dataq/main/install.sh | sudo bash -s -- yourdomain.com
+```
 
-## Learn More
+**Already have your own reverse proxy** (CloudPanel, Nginx, etc.)? Run the
+no-domain form above, then point your proxy at `127.0.0.1:3000` — the
+`caddy` service is entirely optional (it only starts with `--profile
+with-proxy`, which the installer only uses when you pass a domain).
 
-To learn more about Next.js, take a look at the following resources:
+Re-running the installer later pulls the latest code and rebuilds — it never
+touches your `.env` or data once they exist, so it's also how you update.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Manual Docker setup
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+git clone https://github.com/natanidigital/dataq.git
+cd dataq
+cp .env.docker.example .env
+# edit .env: set POSTGRES_PASSWORD and AUTH_SECRET (openssl rand -base64 33)
+docker compose up -d --build app db
+```
 
-## Deploy on Vercel
+## Local development (no Docker)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+npm install
+cp .env.example .env
+# edit .env: DATABASE_URL pointing at a local/reachable PostgreSQL 16
+npx prisma migrate deploy
+npm run dev
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+`npm run db:seed` creates the first admin account if none exists yet
+(username/password are printed to the console).
+
+## Environment variables
+
+| Variable              | Required | Notes                                                                 |
+| ---------------------- | -------- | ---------------------------------------------------------------------- |
+| `DATABASE_URL`         | yes      | PostgreSQL connection string                                          |
+| `AUTH_SECRET`          | yes      | Session signing secret — `openssl rand -base64 33`                    |
+| `NEXTAUTH_URL`         | yes      | Public base URL, e.g. `https://yourdomain.com`                        |
+| `AUTH_TRUST_HOST`      | yes      | `true` — trusts the reverse proxy's forwarded host/proto              |
+| `TOTAL_BANDWIDTH_GB`   | no       | Monthly bandwidth shown on the admin usage chart (default 1000)       |
+
+Everything else — branding, SEO, registration, membership quotas, PayPal
+credentials — is configured at runtime from the admin **Settings** page, not
+environment variables, so it can change without a redeploy.
+
+## Features
+
+- Invite-only by default — an admin creates accounts from **Users**, with an
+  optional **Settings → Access** toggle to open self-registration
+- Direct links, public/private per image, one-click `<img>` HTML snippet
+- Session-deduped view counting (one view per visitor per image, not per
+  request) and a durable monthly bandwidth ledger that survives image deletion
+- Free/Paid membership: Free is capped by configurable image count/storage,
+  Paid is unlimited; PayPal subscriptions can bill this automatically once
+  you connect your own PayPal app in Settings (or assign tiers manually)
+- White-label: upload your own logo, PWA icon, and site name; per-site SEO
+  title/description/social image — all live-editable, no rebuild needed
+- Installable as a PWA (add to phone home screen)
+
+## Deploying without Docker (systemd)
+
+Docker is the supported one-command path, but the app is a normal Next.js
+app underneath — `npm run build && npm run start` behind any reverse proxy
+works too. See `docker-entrypoint.sh` for the exact startup sequence
+(`prisma migrate deploy`, then the idempotent `prisma/seed.ts`, then the
+server) to replicate in a systemd unit.
