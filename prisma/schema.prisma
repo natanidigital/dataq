@@ -1,0 +1,100 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+enum MembershipTier {
+  FREE
+  PAID
+}
+
+model User {
+  id                   String         @id @default(cuid())
+  username             String         @unique
+  passwordHash         String
+  role                 Role           @default(USER)
+  membershipTier       MembershipTier @default(FREE)
+  paypalSubscriptionId String?        @unique
+  createdAt            DateTime       @default(now())
+  images               Image[]
+}
+
+// Single-row table (id is always "singleton") holding the instance's
+// white-label configuration — branding, SEO, registration, and the
+// Free-tier quota / Paid price used for membership gating.
+model SiteSettings {
+  id               String   @id @default("singleton")
+  siteName         String   @default("dataq")
+  logoUrl          String? // null = fall back to the built-in /logo.png
+  showLogoText     Boolean  @default(true)
+  iconUrl          String? // null = fall back to the built-in /icon-*.png
+  pwaTitle         String? // manifest name/short_name — null falls back to siteName
+  seoTitle         String?
+  seoDescription   String?
+  seoOgImageUrl    String?
+  registrationOpen Boolean  @default(false)
+  freeMaxImages    Int      @default(50)
+  freeMaxStorageMB Int      @default(500)
+  paidPriceUsd     Float    @default(5)
+  // PayPal — single-merchant credentials (this instance's own PayPal
+  // Developer app), not a multi-tenant "Connect with PayPal" OAuth flow.
+  // clientSecret is write-only from the admin's perspective: the settings
+  // GET endpoint never echoes it back once set.
+  paypalMode         String? // "sandbox" | "live"
+  paypalClientId     String?
+  paypalClientSecret String?
+  paypalWebhookId    String?
+  paypalPlanId       String? // cached PayPal billing plan id for paidPriceUsd
+  updatedAt          DateTime @updatedAt
+}
+
+model Image {
+  id             String   @id @default(cuid())
+  slug           String   @unique
+  ownerId        String
+  owner          User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  originalFilename String
+  storedFilename String
+  mimeType       String
+  sizeBytes      Int
+  isPublic       Boolean  @default(true)
+  viewCount      Int      @default(0)
+  createdAt      DateTime @default(now())
+  views          ImageView[]
+
+  @@index([ownerId])
+}
+
+// One row per (image, anonymous session) — lets /i/[slug] count "1 view per
+// session" instead of once per HTTP request, so a viewer reloading the same
+// image (or a page embedding it) many times only ever counts once.
+model ImageView {
+  id        String   @id @default(cuid())
+  imageId   String
+  image     Image    @relation(fields: [imageId], references: [id], onDelete: Cascade)
+  sessionId String
+  viewedAt  DateTime @default(now())
+
+  @@unique([imageId, sessionId])
+}
+
+// Durable, monthly bandwidth ledger — deliberately NOT derived from
+// Image.viewCount, because that disappears the moment an image is deleted.
+// `periodKey` is a UTC "YYYY-MM" bucket: the first real (deduped) view in a
+// new month creates a fresh row starting at 0, which is what gives this its
+// "resets every month" behavior with no cron job needed.
+model BandwidthUsage {
+  id          String   @id @default(cuid())
+  periodKey   String   @unique
+  bytesServed BigInt   @default(0)
+  updatedAt   DateTime @updatedAt
+}
