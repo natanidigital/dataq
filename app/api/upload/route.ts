@@ -8,6 +8,8 @@ import { prisma } from "@/lib/prisma";
 import { generateSlug } from "@/lib/slug";
 import { getSiteSettings } from "@/lib/site-settings";
 import { ALLOWED_MIME_TYPES, MAX_UPLOAD_BYTES, UPLOAD_DIR } from "@/lib/upload-config";
+import { detectImage } from "@/lib/image-validation";
+import { isClamAvConfigured, scanBuffer } from "@/lib/clamav";
 
 export async function POST(request: Request) {
   const session = await auth();
@@ -22,8 +24,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "No file provided" }, { status: 400 });
   }
 
-  const extension = ALLOWED_MIME_TYPES[file.type];
-  if (!extension) {
+  if (!ALLOWED_MIME_TYPES[file.type]) {
     return NextResponse.json(
       { error: "Unsupported file type. Allowed: JPG, PNG, GIF, WebP, AVIF." },
       { status: 400 },
@@ -32,6 +33,33 @@ export async function POST(request: Request) {
 
   if (file.size > MAX_UPLOAD_BYTES) {
     return NextResponse.json({ error: "File exceeds the 10MB limit." }, { status: 400 });
+  }
+
+  const buffer = Buffer.from(await file.arrayBuffer());
+
+  // Never trust the client-declared Content-Type for what actually gets
+  // stored and served back — anyone calling this API directly (not through
+  // a browser) can label any file "image/jpeg". Sniff the real bytes
+  // instead: this is what stops an arbitrary file from being smuggled in
+  // under a fake image extension. The detected format (not file.type)
+  // drives everything from here on.
+  const detected = await detectImage(buffer);
+  if (!detected) {
+    return NextResponse.json(
+      { error: "File isn't a valid image (or it's too large/complex to process)." },
+      { status: 400 },
+    );
+  }
+
+  if (isClamAvConfigured()) {
+    const scan = await scanBuffer(buffer);
+    if (scan && !scan.clean) {
+      console.warn(`[upload] rejected infected upload from user ${session.user.id}: ${scan.signature}`);
+      return NextResponse.json(
+        { error: "File failed a security scan and was rejected." },
+        { status: 400 },
+      );
+    }
   }
 
   // Free-tier quota: admins and Paid members are unlimited. Checked against
@@ -72,10 +100,9 @@ export async function POST(request: Request) {
   }
 
   const slug = generateSlug();
-  const storedFilename = `${slug}.${extension}`;
+  const storedFilename = `${slug}.${detected.extension}`;
 
   await mkdir(UPLOAD_DIR, { recursive: true });
-  const buffer = Buffer.from(await file.arrayBuffer());
   await writeFile(path.join(UPLOAD_DIR, storedFilename), buffer);
 
   const image = await prisma.image.create({
@@ -84,7 +111,7 @@ export async function POST(request: Request) {
       ownerId: session.user.id,
       originalFilename: file.name,
       storedFilename,
-      mimeType: file.type,
+      mimeType: detected.mimeType,
       sizeBytes: file.size,
     },
   });

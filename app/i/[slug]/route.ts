@@ -86,6 +86,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
     ETag: etag,
     "Cache-Control": cacheControl,
     "CDN-Cache-Control": cdnCacheControl,
+    // Belt-and-suspenders: the Content-Type set below is always one of a
+    // known-safe image/* value already (see lib/image-validation.ts), but
+    // this stops a browser from ever second-guessing that and sniffing the
+    // bytes as something else.
+    "X-Content-Type-Options": "nosniff",
   });
   if (!existingSessionId) {
     const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";

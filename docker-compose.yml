@@ -29,6 +29,7 @@ services:
       NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
       AUTH_TRUST_HOST: "true"
       TOTAL_BANDWIDTH_GB: ${TOTAL_BANDWIDTH_GB:-1000}
+      CLAMAV_HOST: ${CLAMAV_HOST:-}
     volumes:
       # Uploaded images and admin-uploaded branding assets — the one thing
       # that must survive a container rebuild/redeploy.
@@ -57,8 +58,22 @@ services:
       - caddy_config:/config
     profiles: ["with-proxy"]
 
+  # Optional: real virus scanning for uploads via ClamAV, in addition to the
+  # image-format validation that's always on (see lib/image-validation.ts).
+  # Off by default — it adds ~1-1.5GB RAM usage and a slow first boot while
+  # freshclam downloads virus definitions. Enable with:
+  #   docker compose --profile with-clamav up -d
+  # and set CLAMAV_HOST=clamav in .env so the app actually uses it.
+  clamav:
+    image: clamav/clamav:1.3
+    restart: unless-stopped
+    volumes:
+      - dataq_clamav:/var/lib/clamav
+    profiles: ["with-clamav"]
+
 volumes:
   dataq_db:
   dataq_storage:
+  dataq_clamav:
   caddy_data:
   caddy_config:

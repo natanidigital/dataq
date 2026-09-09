@@ -64,6 +64,7 @@ npm run dev
 | `NEXTAUTH_URL`         | yes      | Public base URL, e.g. `https://yourdomain.com`                        |
 | `AUTH_TRUST_HOST`      | yes      | `true` — trusts the reverse proxy's forwarded host/proto              |
 | `TOTAL_BANDWIDTH_GB`   | no       | Monthly bandwidth shown on the admin usage chart (default 1000)       |
+| `CLAMAV_HOST`          | no       | Enables real virus scanning for uploads — see **Upload safety** below |
 
 Everything else — branding, SEO, registration, membership quotas, PayPal
 credentials — is configured at runtime from the admin **Settings** page, not
@@ -82,6 +83,26 @@ environment variables, so it can change without a redeploy.
 - White-label: upload your own logo, PWA icon, and site name; per-site SEO
   title/description/social image — all live-editable, no rebuild needed
 - Installable as a PWA (add to phone home screen)
+
+## Upload safety
+
+Every upload is validated twice before it's accepted, regardless of what the
+uploading client claims:
+
+1. **Real content check, always on.** The file's actual bytes are decoded
+   with `sharp` — the client's declared file type/extension is never
+   trusted for what gets stored or served back. Anything that isn't a
+   genuine, decodable JPG/PNG/GIF/WebP/AVIF is rejected outright, which
+   stops an arbitrary script or executable from being smuggled in under a
+   fake image extension. SVG is not an accepted format at all (SVGs can
+   embed `<script>` tags), and image responses are served with
+   `X-Content-Type-Options: nosniff`.
+2. **Real virus scanning, optional.** Set `CLAMAV_HOST=clamav` in `.env` and
+   start the stack with `docker compose --profile with-clamav up -d` to scan
+   every upload against ClamAV's signature database before accepting it.
+   This is opt-in because it adds a container using ~1-1.5GB RAM and a slow
+   first boot while it downloads virus definitions — skip it on a small VPS
+   if step 1 is enough for your use case.
 
 ## Deploying without Docker (systemd)
 
