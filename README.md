@@ -85,6 +85,10 @@ environment variables, so it can change without a redeploy.
 - White-label: upload your own logo, PWA icon, and site name; per-site SEO
   title/description/social image — all live-editable, no rebuild needed
 - Installable as a PWA (add to phone home screen)
+- Pluggable storage: keep images on local disk, or offload them to a
+  Cloudflare R2 / S3-compatible bucket — see **Where images are stored**
+- Every upload is content-validated (real bytes, not the claimed type) with
+  optional ClamAV virus scanning — see **Upload safety**
 
 ## Where images are stored
 
