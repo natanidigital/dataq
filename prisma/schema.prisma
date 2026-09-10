@@ -64,6 +64,9 @@ model Image {
   owner          User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   originalFilename String
   storedFilename String
+  // Which backend in lib/storage/ holds this file's bytes ("local", "s3", …).
+  // Recorded per-row so the default can change without orphaning old uploads.
+  storageDriver  String   @default("local")
   mimeType       String
   sizeBytes      Int
   isPublic       Boolean  @default(true)

@@ -1,13 +1,11 @@
-import { mkdir, writeFile } from "fs/promises";
-import path from "path";
-
 import { NextResponse } from "next/server";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { generateSlug } from "@/lib/slug";
 import { getSiteSettings } from "@/lib/site-settings";
-import { ALLOWED_MIME_TYPES, MAX_UPLOAD_BYTES, UPLOAD_DIR } from "@/lib/upload-config";
+import { getStorageDriver } from "@/lib/storage";
+import { ALLOWED_MIME_TYPES, MAX_UPLOAD_BYTES } from "@/lib/upload-config";
 import { detectImage } from "@/lib/image-validation";
 import { isClamAvConfigured, scanBuffer } from "@/lib/clamav";
 
@@ -102,8 +100,8 @@ export async function POST(request: Request) {
   const slug = generateSlug();
   const storedFilename = `${slug}.${detected.extension}`;
 
-  await mkdir(UPLOAD_DIR, { recursive: true });
-  await writeFile(path.join(UPLOAD_DIR, storedFilename), buffer);
+  const storage = getStorageDriver();
+  await storage.put(storedFilename, buffer, { contentType: detected.mimeType });
 
   const image = await prisma.image.create({
     data: {
@@ -111,6 +109,7 @@ export async function POST(request: Request) {
       ownerId: session.user.id,
       originalFilename: file.name,
       storedFilename,
+      storageDriver: storage.name,
       mimeType: detected.mimeType,
       sizeBytes: file.size,
     },

@@ -1,11 +1,8 @@
-import { readFile } from "fs/promises";
-import path from "path";
-
 import { NextResponse } from "next/server";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { UPLOAD_DIR } from "@/lib/upload-config";
+import { getStorageDriverByName } from "@/lib/storage";
 import { VIEW_SESSION_COOKIE, generateViewSessionId } from "@/lib/view-session";
 import { recordBandwidth } from "@/lib/bandwidth";
 
@@ -104,11 +101,27 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
     return new NextResponse(null, { status: 304, headers });
   }
 
+  const storage = getStorageDriverByName(image.storageDriver);
+
+  // If this file's backend can hand out a public URL (e.g. an S3/R2 bucket
+  // fronted by a CDN) and the image is public, redirect the client straight
+  // there — the bytes never pass through this server. The view was already
+  // counted above. The redirect itself is deliberately kept uncacheable so
+  // a later public→private flip takes effect immediately; the bytes behind
+  // it are still cached hard by the object store's own CDN.
+  const directUrl = image.isPublic ? storage.publicUrl(image.storedFilename) : null;
+  if (directUrl) {
+    headers.set("Cache-Control", "no-store");
+    headers.set("CDN-Cache-Control", "no-store");
+    headers.set("Location", directUrl);
+    return new NextResponse(null, { status: 302, headers });
+  }
+
   let buffer: Buffer;
   try {
-    buffer = await readFile(path.join(UPLOAD_DIR, image.storedFilename));
+    buffer = await storage.get(image.storedFilename);
   } catch {
-    return NextResponse.json({ error: "File missing on disk" }, { status: 404 });
+    return NextResponse.json({ error: "File missing from storage" }, { status: 404 });
   }
 
   headers.set("Content-Type", image.mimeType);

@@ -1,11 +1,8 @@
-import { unlink } from "fs/promises";
-import path from "path";
-
 import { NextResponse } from "next/server";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { UPLOAD_DIR } from "@/lib/upload-config";
+import { getStorageDriverByName } from "@/lib/storage";
 
 async function loadOwnedImage(id: string, userId: string, isAdmin: boolean) {
   const image = await prisma.image.findUnique({ where: { id } });
@@ -50,9 +47,14 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   }
 
   await prisma.image.delete({ where: { id } });
-  await unlink(path.join(UPLOAD_DIR, image.storedFilename)).catch(() => {
-    // File already missing on disk — deleting the DB record still succeeds.
-  });
+  // Best-effort: a failure to remove the stored bytes (backend down, key
+  // already gone) shouldn't fail the delete — the row is what governs
+  // access, and each driver's delete() already swallows "not found".
+  try {
+    await getStorageDriverByName(image.storageDriver).delete(image.storedFilename);
+  } catch {
+    // Leave an orphaned object rather than resurrecting the DB row.
+  }
 
   return NextResponse.json({ ok: true });
 }

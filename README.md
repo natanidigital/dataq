@@ -65,6 +65,8 @@ npm run dev
 | `AUTH_TRUST_HOST`      | yes      | `true` — trusts the reverse proxy's forwarded host/proto              |
 | `TOTAL_BANDWIDTH_GB`   | no       | Monthly bandwidth shown on the admin usage chart (default 1000)       |
 | `CLAMAV_HOST`          | no       | Enables real virus scanning for uploads — see **Upload safety** below |
+| `STORAGE_DRIVER`       | no       | `local` (default) or `s3` — see **Where images are stored** below     |
+| `S3_*`                 | if `s3`  | Endpoint / bucket / keys for the S3-compatible store                  |
 
 Everything else — branding, SEO, registration, membership quotas, PayPal
 credentials — is configured at runtime from the admin **Settings** page, not
@@ -83,6 +85,38 @@ environment variables, so it can change without a redeploy.
 - White-label: upload your own logo, PWA icon, and site name; per-site SEO
   title/description/social image — all live-editable, no rebuild needed
 - Installable as a PWA (add to phone home screen)
+
+## Where images are stored
+
+By default (`STORAGE_DRIVER=local`) uploaded bytes live on the app server's
+own disk under `storage/uploads/` (the `dataq_storage` volume under Docker).
+
+Set `STORAGE_DRIVER=s3` to offload them to any S3-compatible object store —
+**Cloudflare R2**, Backblaze B2, Wasabi, AWS S3 — and fill in:
+
+```
+S3_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com
+S3_REGION=auto
+S3_BUCKET=your-bucket
+S3_ACCESS_KEY_ID=...
+S3_SECRET_ACCESS_KEY=...
+S3_PUBLIC_BASE_URL=          # optional — see below
+```
+
+Each image records which backend it was uploaded under, so you can switch
+this on at any time — images already on local disk keep being served from
+there, new uploads go to S3.
+
+**With `S3_PUBLIC_BASE_URL` set** (a read-only CDN or custom domain bound to
+the bucket, e.g. an R2 public bucket URL), public images are `302`-redirected
+straight to the object store — their bytes never pass through the app server
+at all, so it uses effectively no bandwidth for them. R2 in particular
+charges nothing for egress. Private images are always proxied through the
+app's access-controlled route regardless, and the redirect itself is sent
+uncacheable so flipping an image back to private takes effect immediately.
+
+**Without it**, every image (public or private) is streamed through the app
+from S3 — the bytes are off the app's disk but still cross its network.
 
 ## Upload safety
 
