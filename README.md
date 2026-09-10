@@ -142,10 +142,15 @@ uploading client claims:
    first boot while it downloads virus definitions — skip it on a small VPS
    if step 1 is enough for your use case.
 
-## Deploying without Docker (systemd)
+## Deploying without Docker
 
-Docker is the supported one-command path, but the app is a normal Next.js
-app underneath — `npm run build && npm run start` behind any reverse proxy
-works too. See `docker-entrypoint.sh` for the exact startup sequence
-(`prisma migrate deploy`, then the idempotent `prisma/seed.ts`, then the
-server) to replicate in a systemd unit.
+**systemd on a VPS** — the app is a normal Next.js app underneath, so
+`npm run build && npm run start` behind any reverse proxy works. See
+`docker-entrypoint.sh` for the exact startup sequence (`prisma migrate
+deploy`, then the idempotent `prisma/seed.ts`, then the server) to replicate
+in a systemd unit.
+
+**Shared hosting (cPanel "Setup Node.js App")** — possible but fiddly, and
+it needs PostgreSQL (most shared plans are MySQL-only, so you'll likely
+point `DATABASE_URL` at a free external Postgres like Neon). Step-by-step:
+[docs/shared-hosting.md](docs/shared-hosting.md).
