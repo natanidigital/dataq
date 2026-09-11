@@ -7,10 +7,16 @@
 # scoped to just the natanidigital/dataq repository with Contents: Read-only,
 # then:
 #
-#   export GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-#   curl -fsSL -H "Authorization: token $GITHUB_TOKEN" \
-#     https://raw.githubusercontent.com/natanidigital/dataq/main/install.sh \
+#   export GITHUB_TOKEN=github_pat_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+#   curl -fsSL -H "Authorization: Bearer $GITHUB_TOKEN" \
+#     -H "Accept: application/vnd.github.raw+json" \
+#     https://api.github.com/repos/natanidigital/dataq/contents/install.sh \
 #     | sudo GITHUB_TOKEN="$GITHUB_TOKEN" bash
+#
+# Fetch this through api.github.com, NOT raw.githubusercontent.com — the
+# latter is known to reject fine-grained tokens (github_pat_...) with a
+# plain 404 even when the token is valid, and separately caches responses
+# for several minutes so a just-pushed fix wouldn't show up right away.
 #
 # With a domain that already points at this server's IP, for automatic
 # HTTPS via Caddy, add ` -s -- yourdomain.com` after `bash` above.

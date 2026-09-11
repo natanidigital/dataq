@@ -13,11 +13,16 @@ a classic token with the broad `repo` scope). Then, on a clean Ubuntu/Debian
 server:
 
 ```bash
-export GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-curl -fsSL -H "Authorization: token $GITHUB_TOKEN" \
-  https://raw.githubusercontent.com/natanidigital/dataq/main/install.sh \
+export GITHUB_TOKEN=github_pat_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+curl -fsSL -H "Authorization: Bearer $GITHUB_TOKEN" \
+  -H "Accept: application/vnd.github.raw+json" \
+  https://api.github.com/repos/natanidigital/dataq/contents/install.sh \
   | sudo GITHUB_TOKEN="$GITHUB_TOKEN" bash
 ```
+
+Fetch through `api.github.com`, not `raw.githubusercontent.com` — the latter
+is known to 404 fine-grained tokens even when they're valid, and separately
+caches responses for several minutes.
 
 This installs Docker if it's missing, clones the repo to `/opt/dataq`,
 generates a `.env` with fresh secrets, and starts the app + database with
@@ -30,8 +35,9 @@ again on every future run, including updates.
 [Caddy](https://caddyserver.com/), add the domain after `bash`:
 
 ```bash
-curl -fsSL -H "Authorization: token $GITHUB_TOKEN" \
-  https://raw.githubusercontent.com/natanidigital/dataq/main/install.sh \
+curl -fsSL -H "Authorization: Bearer $GITHUB_TOKEN" \
+  -H "Accept: application/vnd.github.raw+json" \
+  https://api.github.com/repos/natanidigital/dataq/contents/install.sh \
   | sudo GITHUB_TOKEN="$GITHUB_TOKEN" bash -s -- yourdomain.com
 ```
 
