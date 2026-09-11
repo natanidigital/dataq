@@ -5,15 +5,17 @@ FROM node:22-slim AS base
 WORKDIR /app
 
 FROM base AS deps
-# `npm ci` below runs the "postinstall" script (`prisma generate`), and
-# prisma.config.ts requires DATABASE_URL to be resolvable just to load —
-# but no real database exists yet at build time. This placeholder only
-# ever needs to be a well-formed connection string; nothing at build time
-# actually connects to it. It's never baked into the final `runner` stage
-# (that's built fresh from `base`, not from this stage) — the real
-# DATABASE_URL comes from docker-compose's `environment:` at container start.
+# `npm ci` below runs the "postinstall" script (`prisma generate`), which
+# needs both the schema itself and prisma.config.ts (which declares its
+# path) present on disk — so those are copied here too, not just the lock
+# files — and needs DATABASE_URL to be resolvable just to load the config,
+# even though nothing at build time ever actually connects to it. This
+# placeholder is never baked into the final `runner` stage (that's built
+# fresh from `base`, not from this stage) — the real DATABASE_URL comes
+# from docker-compose's `environment:` at container start.
 ENV DATABASE_URL="postgresql://build:build@localhost:5432/build"
-COPY package.json package-lock.json ./
+COPY package.json package-lock.json prisma.config.ts ./
+COPY prisma ./prisma
 RUN npm ci
 
 FROM deps AS build
