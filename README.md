@@ -4,41 +4,30 @@ Self-hosted, private image hosting — invite-only, direct links, public/private
 toggle, admin-managed users with Free/Paid membership tiers, and white-label
 branding (logo, PWA icon, SEO). Built with Next.js, Prisma, and PostgreSQL.
 
+This project's install scripts assume the `natanidigital/dataq` GitHub repo
+is **public** — if you've kept it private, `curl`ing `install.sh` and the
+`git clone` inside it will both 404/fail. Make the repo public (Settings →
+General → Danger Zone → Change visibility) before using the commands below,
+or substitute your own fork/mirror's URL throughout.
+
 ## Quick install (fresh VPS, root)
 
-This repo is **private**, so you need a GitHub Personal Access Token to
-fetch the code — a [fine-grained token](https://github.com/settings/tokens?type=beta)
-scoped to just this repository with **Contents: Read-only** is enough (avoid
-a classic token with the broad `repo` scope). Then, on a clean Ubuntu/Debian
-server:
+One command, on a clean Ubuntu/Debian server:
 
 ```bash
-export GITHUB_TOKEN=github_pat_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-curl -fsSL -H "Authorization: Bearer $GITHUB_TOKEN" \
-  -H "Accept: application/vnd.github.raw+json" \
-  https://api.github.com/repos/natanidigital/dataq/contents/install.sh \
-  | sudo GITHUB_TOKEN="$GITHUB_TOKEN" bash
+curl -fsSL https://raw.githubusercontent.com/natanidigital/dataq/main/install.sh | sudo bash
 ```
-
-Fetch through `api.github.com`, not `raw.githubusercontent.com` — the latter
-is known to 404 fine-grained tokens even when they're valid, and separately
-caches responses for several minutes.
 
 This installs Docker if it's missing, clones the repo to `/opt/dataq`,
 generates a `.env` with fresh secrets, and starts the app + database with
 `docker compose`. When it finishes it prints the app's URL and the seeded
-admin username/password (shown once — save them). The token is only used to
-fetch the code — it's never written to disk, and you'll need to supply it
-again on every future run, including updates.
+admin username/password (shown once — save them).
 
 **With a domain already pointed at the server**, for automatic HTTPS via
-[Caddy](https://caddyserver.com/), add the domain after `bash`:
+[Caddy](https://caddyserver.com/):
 
 ```bash
-curl -fsSL -H "Authorization: Bearer $GITHUB_TOKEN" \
-  -H "Accept: application/vnd.github.raw+json" \
-  https://api.github.com/repos/natanidigital/dataq/contents/install.sh \
-  | sudo GITHUB_TOKEN="$GITHUB_TOKEN" bash -s -- yourdomain.com
+curl -fsSL https://raw.githubusercontent.com/natanidigital/dataq/main/install.sh | sudo bash -s -- yourdomain.com
 ```
 
 **Already have your own reverse proxy** (CloudPanel, Nginx, etc.)? Run the
@@ -50,11 +39,6 @@ Re-running the installer later pulls the latest code and rebuilds — it never
 touches your `.env` or data once they exist, so it's also how you update.
 
 ## Manual Docker setup
-
-Being a private repo, `git clone` needs a token too — either
-`git clone https://<GITHUB_TOKEN>@github.com/natanidigital/dataq.git`, or
-plain `git clone https://github.com/natanidigital/dataq.git` and enter the
-token as the password when prompted (username can be anything).
 
 ```bash
 git clone https://github.com/natanidigital/dataq.git
