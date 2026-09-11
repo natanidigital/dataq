@@ -1,19 +1,28 @@
 #!/bin/sh
 # One-command installer for dataq on a fresh Linux VPS (root).
 #
-#   curl -fsSL https://raw.githubusercontent.com/natanidigital/dataq/main/install.sh | sudo bash
+# The dataq repo is PRIVATE, so this needs a GitHub Personal Access Token
+# with read access to it — both to fetch this script itself and to clone
+# the code. Create one at https://github.com/settings/tokens?type=beta,
+# scoped to just the natanidigital/dataq repository with Contents: Read-only,
+# then:
+#
+#   export GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+#   curl -fsSL -H "Authorization: token $GITHUB_TOKEN" \
+#     https://raw.githubusercontent.com/natanidigital/dataq/main/install.sh \
+#     | sudo GITHUB_TOKEN="$GITHUB_TOKEN" bash
 #
 # With a domain that already points at this server's IP, for automatic
-# HTTPS via Caddy:
-#
-#   curl -fsSL https://raw.githubusercontent.com/natanidigital/dataq/main/install.sh | sudo bash -s -- yourdomain.com
+# HTTPS via Caddy, add ` -s -- yourdomain.com` after `bash` above.
 #
 # Re-running this script (e.g. to update) is safe: it pulls the latest
 # code and re-runs `docker compose up -d --build` without touching your
-# existing .env or data volumes.
+# existing .env or data volumes. GITHUB_TOKEN must be supplied every run —
+# it's never written to disk.
 set -e
 
-REPO_URL="https://github.com/natanidigital/dataq.git"
+REPO_SLUG="natanidigital/dataq"
+REPO_URL="https://github.com/${REPO_SLUG}.git"
 INSTALL_DIR="${INSTALL_DIR:-/opt/dataq}"
 DOMAIN="$1"
 
@@ -21,6 +30,15 @@ if [ "$(id -u)" -ne 0 ]; then
   echo "Please run as root (e.g. with sudo)." >&2
   exit 1
 fi
+
+if [ -z "$GITHUB_TOKEN" ]; then
+  echo "This repo is private — set GITHUB_TOKEN to a GitHub Personal Access" >&2
+  echo "Token with read access to natanidigital/dataq first, e.g.:" >&2
+  echo "  export GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" >&2
+  echo "See the comment at the top of this script for the full command." >&2
+  exit 1
+fi
+AUTH_URL="https://${GITHUB_TOKEN}@github.com/${REPO_SLUG}.git"
 
 if ! command -v docker >/dev/null 2>&1; then
   echo "==> Installing Docker..."
@@ -33,13 +51,20 @@ if ! docker compose version >/dev/null 2>&1; then
   exit 1
 fi
 
+# The token is only ever used transiently for the clone/pull itself — the
+# remote is reset to the bare (non-token) URL immediately after, so it
+# doesn't sit in .git/config afterward. You'll need to supply GITHUB_TOKEN
+# again on every future run (including updates).
 if [ -d "$INSTALL_DIR/.git" ]; then
   echo "==> Updating existing install at $INSTALL_DIR..."
+  git -C "$INSTALL_DIR" remote set-url origin "$AUTH_URL"
   git -C "$INSTALL_DIR" pull --ff-only
+  git -C "$INSTALL_DIR" remote set-url origin "$REPO_URL"
 else
   echo "==> Cloning dataq into $INSTALL_DIR..."
   command -v git >/dev/null 2>&1 || (apt-get update -qq && apt-get install -y -qq git)
-  git clone "$REPO_URL" "$INSTALL_DIR"
+  git clone "$AUTH_URL" "$INSTALL_DIR"
+  git -C "$INSTALL_DIR" remote set-url origin "$REPO_URL"
 fi
 cd "$INSTALL_DIR"
 

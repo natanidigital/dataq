@@ -65,8 +65,13 @@ SSH. Keep it handy.
 Into the application root (`/home/USER/dataq`), **without** `node_modules`,
 `.next`, `.env`, or `storage/`:
 
-- **With SSH + git:** `cd ~/dataq && git clone https://github.com/natanidigital/dataq.git .`
-- **Without:** download the repo ZIP from GitHub, upload via File Manager, extract into the app root.
+- **With SSH + git:** the repo is private, so `git clone` needs a
+  [fine-grained Personal Access Token](https://github.com/settings/tokens?type=beta)
+  scoped to just this repo with Contents: Read-only:
+  `cd ~/dataq && git clone https://<GITHUB_TOKEN>@github.com/natanidigital/dataq.git .`
+- **Without SSH:** download the repo ZIP from GitHub (you'll need to be
+  logged in with access to the repo, or generate the ZIP via the API with
+  the same token), upload via File Manager, extract into the app root.
 
 ---
 

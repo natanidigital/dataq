@@ -6,22 +6,33 @@ branding (logo, PWA icon, SEO). Built with Next.js, Prisma, and PostgreSQL.
 
 ## Quick install (fresh VPS, root)
 
-One command, on a clean Ubuntu/Debian server:
+This repo is **private**, so you need a GitHub Personal Access Token to
+fetch the code — a [fine-grained token](https://github.com/settings/tokens?type=beta)
+scoped to just this repository with **Contents: Read-only** is enough (avoid
+a classic token with the broad `repo` scope). Then, on a clean Ubuntu/Debian
+server:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/natanidigital/dataq/main/install.sh | sudo bash
+export GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+curl -fsSL -H "Authorization: token $GITHUB_TOKEN" \
+  https://raw.githubusercontent.com/natanidigital/dataq/main/install.sh \
+  | sudo GITHUB_TOKEN="$GITHUB_TOKEN" bash
 ```
 
 This installs Docker if it's missing, clones the repo to `/opt/dataq`,
 generates a `.env` with fresh secrets, and starts the app + database with
 `docker compose`. When it finishes it prints the app's URL and the seeded
-admin username/password (shown once — save them).
+admin username/password (shown once — save them). The token is only used to
+fetch the code — it's never written to disk, and you'll need to supply it
+again on every future run, including updates.
 
 **With a domain already pointed at the server**, for automatic HTTPS via
-[Caddy](https://caddyserver.com/):
+[Caddy](https://caddyserver.com/), add the domain after `bash`:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/natanidigital/dataq/main/install.sh | sudo bash -s -- yourdomain.com
+curl -fsSL -H "Authorization: token $GITHUB_TOKEN" \
+  https://raw.githubusercontent.com/natanidigital/dataq/main/install.sh \
+  | sudo GITHUB_TOKEN="$GITHUB_TOKEN" bash -s -- yourdomain.com
 ```
 
 **Already have your own reverse proxy** (CloudPanel, Nginx, etc.)? Run the
@@ -33,6 +44,11 @@ Re-running the installer later pulls the latest code and rebuilds — it never
 touches your `.env` or data once they exist, so it's also how you update.
 
 ## Manual Docker setup
+
+Being a private repo, `git clone` needs a token too — either
+`git clone https://<GITHUB_TOKEN>@github.com/natanidigital/dataq.git`, or
+plain `git clone https://github.com/natanidigital/dataq.git` and enter the
+token as the password when prompted (username can be anything).
 
 ```bash
 git clone https://github.com/natanidigital/dataq.git
