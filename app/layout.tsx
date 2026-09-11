@@ -16,7 +16,21 @@ const geistMono = Geist_Mono({
 });
 
 export async function generateMetadata(): Promise<Metadata> {
-  const settings = await getSiteSettings();
+  // generateMetadata is inherited by every route, including Next's built-in
+  // /_not-found — which gets statically prerendered at *build* time, so
+  // this can run with no reachable database at all (e.g. during `docker
+  // build`, before the app and its db ever run together). Fall back to
+  // plain defaults rather than failing the whole build. This never hides a
+  // real outage in production: if the database is actually down at request
+  // time, every other page fails loudly anyway.
+  const settings = await getSiteSettings().catch(() => null);
+  if (!settings) {
+    return {
+      title: "dataq",
+      description: "Private image hosting",
+      robots: { index: false, follow: false },
+    };
+  }
 
   return {
     title: settings.seoTitle || settings.siteName,
