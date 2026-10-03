@@ -1,0 +1,13 @@
+[Unit]
+Description=dataq: prune ImageView rows older than 2 days
+After=postgresql.service
+
+[Service]
+Type=oneshot
+User=dataq
+Group=dataq
+EnvironmentFile=/home/dataq/htdocs/dataq.space/.env.production
+ExecStart=/usr/bin/psql ${DATABASE_URL} -v ON_ERROR_STOP=1 -At -f /home/dataq/htdocs/dataq.space/deploy/prune-views.sql
+Nice=10
+IOSchedulingClass=idle
+SyslogIdentifier=dataq-prune-views

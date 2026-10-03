@@ -1,0 +1,34 @@
+#!/bin/bash
+# Keeps /etc/nginx/sites-enabled/00-dataq-cloudflare-geo.conf in sync with Cloudflare's published ranges.
+# The geo variable $dataq_from_cf is 1 only when the TCP peer is Cloudflare (or localhost).
+set -euo pipefail
+OUT=/etc/nginx/sites-enabled/00-dataq-cloudflare-geo.conf
+TMP=$(mktemp)
+v4=$(curl -fsS --max-time 20 https://www.cloudflare.com/ips-v4)
+v6=$(curl -fsS --max-time 20 https://www.cloudflare.com/ips-v6)
+re4='^([0-9]{1,3}\.){3}[0-9]{1,3}/[0-9]{1,2}$'
+re6='^[0-9a-fA-F:]+/[0-9]{1,3}$'
+n4=$(grep -Ec "$re4" <<<"$v4" || true); n6=$(grep -Ec "$re6" <<<"$v6" || true)
+if [ "$n4" -lt 10 ] || [ "$n6" -lt 5 ]; then
+  echo "unexpected Cloudflare list (v4=$n4 v6=$n6) - keeping current config" >&2; rm -f "$TMP"; exit 1
+fi
+{
+  echo "# Managed by /usr/local/sbin/dataq-update-cf-ips - do not edit by hand. Source: https://www.cloudflare.com/ips"
+  echo "geo \$realip_remote_addr \$dataq_from_cf {"
+  echo "    default 0;"
+  echo "    127.0.0.1 1;"
+  echo "    ::1 1;"
+  grep -E "$re4" <<<"$v4" | sed 's/^/    /;s/$/ 1;/'
+  grep -E "$re6" <<<"$v6" | sed 's/^/    /;s/$/ 1;/'
+  echo "}"
+} > "$TMP"
+if [ -f "$OUT" ] && cmp -s "$TMP" "$OUT"; then rm -f "$TMP"; echo "unchanged ($n4 v4 + $n6 v6 ranges)"; exit 0; fi
+[ -f "$OUT" ] && cp -a "$OUT" "$OUT.bak"
+install -m 644 "$TMP" "$OUT"; rm -f "$TMP"
+if nginx -t >/dev/null 2>&1; then
+  systemctl reload nginx; rm -f "$OUT.bak"; echo "updated ($n4 v4 + $n6 v6 ranges)"
+else
+  echo "nginx -t failed - rolling back" >&2
+  if [ -f "$OUT.bak" ]; then mv "$OUT.bak" "$OUT"; else rm -f "$OUT"; fi
+  exit 1
+fi

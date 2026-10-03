@@ -1,0 +1,7 @@
+[Unit]
+Description=dataq: refresh Cloudflare IP ranges for the dataq.space nginx vhost
+After=network-online.target
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/dataq-update-cf-ips
+SyslogIdentifier=dataq-update-cf-ips

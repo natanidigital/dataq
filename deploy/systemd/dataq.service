@@ -1,0 +1,19 @@
+[Unit]
+Description=dataq.space private image hosting (Next.js)
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=dataq
+Group=dataq
+WorkingDirectory=/home/dataq/htdocs/dataq.space
+EnvironmentFile=/home/dataq/htdocs/dataq.space/.env.production
+ExecStart=/home/dataq/.nvm/versions/node/v22.23.2/bin/node /home/dataq/htdocs/dataq.space/node_modules/.bin/next start -p 3200
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=dataq
+
+[Install]
+WantedBy=multi-user.target

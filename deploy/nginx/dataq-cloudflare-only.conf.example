@@ -1,0 +1,4 @@
+# Add inside the *main* `server { ... }` block of the dataq vhost, right after server_name.
+# $dataq_from_cf is defined by /etc/nginx/sites-enabled/00-dataq-cloudflare-geo.conf, which
+# deploy/sbin/dataq-update-cf-ips generates and keeps current from Cloudflare's published ranges.
+  if ($dataq_from_cf = 0) { return 444; }

@@ -167,6 +167,11 @@ uploading client claims:
 deploy`, then the idempotent `prisma/seed.ts`, then the server) to replicate
 in a systemd unit.
 
+**Behind Cloudflare with R2 (high-traffic image host)** — the setup `dataq.space` itself runs: R2 custom
+domain, cache rule for `/i/*`, view-table pruning, and locking the origin to Cloudflare. The real
+systemd/nginx files are in [`deploy/`](deploy), the walkthrough in
+[docs/cloudflare-and-r2.md](docs/cloudflare-and-r2.md).
+
 **Shared hosting (cPanel "Setup Node.js App")** — possible but fiddly, and
 it needs PostgreSQL (most shared plans are MySQL-only, so you'll likely
 point `DATABASE_URL` at a free external Postgres like Neon). Step-by-step:
