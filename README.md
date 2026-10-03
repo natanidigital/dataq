@@ -121,9 +121,20 @@ there, new uploads go to S3.
 the bucket, e.g. an R2 public bucket URL), public images are `302`-redirected
 straight to the object store — their bytes never pass through the app server
 at all, so it uses effectively no bandwidth for them. R2 in particular
-charges nothing for egress. Private images are always proxied through the
-app's access-controlled route regardless, and the redirect itself is sent
-uncacheable so flipping an image back to private takes effect immediately.
+charges nothing for egress. The redirect is cacheable (5 min in browsers,
+10 min at a CDN edge) so a heavily embedded image doesn't cost one origin
+request per page view.
+
+> **Privacy caveat:** a bucket served through a public domain exposes *every*
+> object at `https://<your-domain>/<slug>.<ext>`, including images marked
+> Private in dataq. Private images are still proxied through the app's
+> access-controlled route (and never redirected), but anyone who learns the
+> object key can fetch it straight from the bucket domain. Don't rely on the
+> Private toggle for sensitive images when `S3_PUBLIC_BASE_URL` is set —
+> or leave it unset and keep the bucket private.
+
+Cloudflare note: R2 custom domains must be on a zone in the **same
+Cloudflare account** as the bucket.
 
 **Without it**, every image (public or private) is streamed through the app
 from S3 — the bytes are off the app's disk but still cross its network.

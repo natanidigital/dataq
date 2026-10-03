@@ -115,13 +115,16 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
   // If this file's backend can hand out a public URL (e.g. an S3/R2 bucket
   // fronted by a CDN) and the image is public, redirect the client straight
   // there — the bytes never pass through this server. The view was already
-  // counted above. The redirect itself is deliberately kept uncacheable so
-  // a later public→private flip takes effect immediately; the bytes behind
-  // it are still cached hard by the object store's own CDN.
+  // counted above. The redirect is cached briefly (5 min in browsers, 10 min
+  // at the CDN edge) so a viral embed doesn't turn into one origin request
+  // per page view; the bytes behind it are cached by the object store's own
+  // CDN. Note the object itself is world-readable at its bucket URL, so a
+  // public→private flip only affects this route — it doesn't revoke access
+  // to the bucket URL (see README, "Where images are stored").
   const directUrl = image.isPublic ? storage.publicUrl(image.storedFilename) : null;
   if (directUrl) {
-    headers.set("Cache-Control", "no-store");
-    headers.set("CDN-Cache-Control", "no-store");
+    headers.set("Cache-Control", "public, max-age=300");
+    headers.set("CDN-Cache-Control", "public, max-age=600");
     headers.set("Location", directUrl);
     return new NextResponse(null, { status: 302, headers });
   }
