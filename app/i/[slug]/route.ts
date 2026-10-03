@@ -89,7 +89,16 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
     // bytes as something else.
     "X-Content-Type-Options": "nosniff",
   });
-  if (!existingSessionId) {
+  // Never set the view-session cookie on a *public* image response: a
+  // Set-Cookie header makes Cloudflare (and most CDNs) refuse to cache the
+  // response (cf-cache-status: BYPASS), so every hit would reach this
+  // origin. It also never worked for the traffic that matters most —
+  // hotlinked <img> loads are cross-site, where a SameSite=Lax cookie is
+  // neither stored nor sent. Public views behind a CDN are therefore
+  // counted per origin request (i.e. per edge cache miss); private images
+  // are never edge-cached and keep the cookie-based one-view-per-session
+  // dedupe.
+  if (!existingSessionId && !image.isPublic) {
     const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
     headers.append(
       "Set-Cookie",
